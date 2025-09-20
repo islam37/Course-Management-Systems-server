@@ -23,17 +23,30 @@ async function run() {
 
     // Select DB & collection
     const database = client.db(process.env.DB_NAME);
-    const coursesCollection = database.collection('courses');
+    const coursesCollection = database.collection("courses");
+    const enrollmentsCollection = database.collection("enrollments");
 
     // Routes
     app.get('/', (req, res) => {
       res.send('Course management server is running!');
     });
 
-    // Example: get all courses
-    app.get('/courses', async (req, res) => {
-      const courses = await coursesCollection.find({}).toArray();
+    
+    
+    // Get all courses
+    app.get("/courses", async (req, res) => {
+      const email = req.query.email; // filter by user email
+      let query = {};
+      if (email) query.email = email;
+      const courses = await coursesCollection.find(query).toArray();
       res.send(courses);
+    });
+
+    // Get single course by ID
+    app.get("/courses/:id", async (req, res) => {
+      const id = req.params.id;
+      const course = await coursesCollection.findOne({ _id: new ObjectId(id) });
+      res.send(course);
     });
 
     // Example: add a new course
