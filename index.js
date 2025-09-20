@@ -49,12 +49,25 @@ async function run() {
       res.send(course);
     });
 
-    // Example: add a new course
-    app.post('/courses', async (req, res) => {
+   // Add new course
+    app.post("/courses", async (req, res) => {
       const newCourse = req.body;
       const result = await coursesCollection.insertOne(newCourse);
       res.send(result);
     });
+
+     // Update course
+    app.put("/courses/:id", async (req, res) => {
+      const id = req.params.id;
+      const updatedCourse = req.body;
+      const result = await coursesCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: updatedCourse }
+      );
+      res.send(result);
+    });
+
+    
 
   } catch (error) {
     console.error(' MongoDB connection failed:', error);
