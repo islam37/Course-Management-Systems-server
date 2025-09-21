@@ -38,7 +38,7 @@ async function run() {
 
 // Routes
 
-// Health check
+
 app.get("/", (req, res) => {
   res.json({ message: "Course management server is running!", status: "OK" });
 });
@@ -108,21 +108,35 @@ app.post("/courses", async (req, res) => {
   }
 });
 
-// Update course
 app.put("/courses/:id", async (req, res) => {
   try {
     const id = req.params.id;
-    const updatedCourse = req.body;
+    const { title, shortDescription, imageURL, duration, fullDescription } = req.body;
     
     if (!ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid course ID format" });
     }
     
-    updatedCourse.updatedAt = new Date();
+    // Only update allowed fields
+    const updateData = {
+      title,
+      shortDescription,
+      imageURL,
+      duration,
+      fullDescription,
+      updatedAt: new Date()
+    };
+    
+    // Remove undefined fields
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key] === undefined) {
+        delete updateData[key];
+      }
+    });
     
     const result = await coursesCollection.updateOne(
       { _id: new ObjectId(id) },
-      { $set: updatedCourse }
+      { $set: updateData }
     );
     
     if (result.matchedCount === 0) {
