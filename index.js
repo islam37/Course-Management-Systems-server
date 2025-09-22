@@ -7,8 +7,12 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+
 app.use(express.json());
+
+app.use(cors({
+  origin: "*" 
+}));
 
 // Build MongoDB URI using env variables
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.pihhew7.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -17,24 +21,25 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
 const client = new MongoClient(uri);
 
 // Database connection
-let database, coursesCollection, enrollmentsCollection;
+//let database, coursesCollection, enrollmentsCollection;
+const database = client.db(process.env.DB_NAME);
+    const coursesCollection = database.collection("courses");
+    const enrollmentsCollection = database.collection("enrollments");
 
-async function run() {
-  try {
-    await client.connect();
-    console.log(" Connected to MongoDB successfully!");
 
-    // Select DB & collection
-    database = client.db(process.env.DB_NAME);
-    coursesCollection = database.collection("courses");
-    enrollmentsCollection = database.collection("enrollments");
+// async function run() {
+//   try {
+//     await client.connect();
+//     console.log(" Connected to MongoDB successfully!");
 
-    console.log(" Database collections initialized");
-  } catch (error) {
-    console.error(" MongoDB connection failed:", error);
-    process.exit(1);
-  }
-}
+//     // Select DB & collection
+    
+//     console.log(" Database collections initialized");
+//   } catch (error) {
+//     console.error(" MongoDB connection failed:", error);
+//     process.exit(1);
+//   }
+// }
 
 // Routes
 
@@ -337,13 +342,16 @@ app.use((req, res) => {
 });
 
 // Start server only after DB connection
-run().then(() => {
-  app.listen(port, () => {
+// run().then(() => {
+ 
+// }).catch(error => {
+//   console.error("Failed to start server:", error);
+//   process.exit(1);
+// });
+
+
+
+ app.listen(port, () => {
     console.log(` Server listening on port ${port}`);
   });
-}).catch(error => {
-  console.error("Failed to start server:", error);
-  process.exit(1);
-});
-
-module.exports = app;
+//module.exports = app;
