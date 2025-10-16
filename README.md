@@ -1,4 +1,4 @@
-# Course Management System - Client
+# Course Management System - server
 
 A **responsive web application** for browsing, enrolling, and managing courses.  
 This project demonstrates practical skills in React.js, TailwindCSS, Firebase Authentication, and integration with a Node.js/Express backend with MongoDB.
