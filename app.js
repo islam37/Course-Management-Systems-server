@@ -1,9 +1,10 @@
 const express = require("express");
 const cors = require("cors");
-require("dotenv").config();
-const { MongoClient, ObjectId } = require("mongodb");
+const { ObjectId } = require("mongodb");
+const { getCollections } = require("./config/database");
 
 const app = express();
+const { coursesCollection, enrollmentsCollection } = getCollections();
 
 // Middleware
 
@@ -12,33 +13,6 @@ app.use(express.json());
 app.use(cors({
   origin: "*" 
 }));
-
-// Build MongoDB URI using env variables
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.pihhew7.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
-
-// Create MongoDB client
-const client = new MongoClient(uri);
-
-// Database connection
-//let database, coursesCollection, enrollmentsCollection;
-const database = client.db(process.env.DB_NAME);
-    const coursesCollection = database.collection("courses");
-    const enrollmentsCollection = database.collection("enrollments");
-
-
-// async function run() {
-//   try {
-//     await client.connect();
-//     console.log(" Connected to MongoDB successfully!");
-
-//     // Select DB & collection
-    
-//     console.log(" Database collections initialized");
-//   } catch (error) {
-//     console.error(" MongoDB connection failed:", error);
-//     process.exit(1);
-//   }
-// }
 
 // Routes
 
