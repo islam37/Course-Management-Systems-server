@@ -3,10 +3,11 @@ const cors = require("cors");
 const { ObjectId } = require("mongodb");
 const { getCollections } = require("./config/database");
 const createCourseRouter = require("./routes/course.routes");
+const createEnrollmentRouter = require("./routes/enrollment.routes");
 
 const app = express();
 const collections = getCollections();
-const { coursesCollection, enrollmentsCollection } = collections;
+const { coursesCollection } = collections;
 
 // Middleware
 
@@ -24,63 +25,7 @@ app.get("/", (req, res) => {
 });
 
 app.use("/courses", createCourseRouter(collections));
-
-// Enroll in a course
-app.post("/enrollments", async (req, res) => {
-  try {
-    const { email, courseId } = req.body;
-    
-    if (!email || !courseId) {
-      return res.status(400).json({ message: "Email and courseId are required" });
-    }
-    
-    if (!ObjectId.isValid(courseId)) {
-      return res.status(400).json({ message: "Invalid course ID format" });
-    }
-    
-    // Check if course exists
-    const course = await coursesCollection.findOne({ _id: new ObjectId(courseId) });
-    if (!course) {
-      return res.status(404).json({ message: "Course not found" });
-    }
-    
-    // Check if already enrolled
-    const existingEnrollment = await enrollmentsCollection.findOne({ 
-      email, 
-      courseId: new ObjectId(courseId) 
-    });
-    
-    if (existingEnrollment) {
-      return res.status(409).json({ message: "Already enrolled in this course", enrolled: true });
-    }
-    
-    // Create new enrollment
-    const enrollment = { 
-      email, 
-      courseId: new ObjectId(courseId), 
-      createdAt: new Date(),
-      courseTitle: course.title,
-      courseDescription: course.shortDescription
-    };
-    
-    const result = await enrollmentsCollection.insertOne(enrollment);
-    
-    // Update course enrollment count
-    await coursesCollection.updateOne(
-      { _id: new ObjectId(courseId) },
-      { $inc: { enrollCount: 1 } }
-    );
-    
-    res.status(201).json({
-      message: "Successfully enrolled in course",
-      enrollmentId: result.insertedId,
-      enrolled: true
-    });
-  } catch (error) {
-    console.error("Error enrolling in course:", error);
-    res.status(500).json({ message: "Failed to enroll in course", error: error.message });
-  }
-});
+app.use("/enrollments", createEnrollmentRouter(collections));
 
 
 // Review Api
@@ -152,98 +97,6 @@ app.get("/courses/:id/reviews", async (req, res) => {
 
 
 
-// Check if user is enrolled in a course
-app.get("/enrollments/check", async (req, res) => {
-  try {
-    const { email, courseId } = req.query;
-    
-    if (!email || !courseId) {
-      return res.status(400).json({ message: "Email and courseId are required" });
-    }
-    
-    if (!ObjectId.isValid(courseId)) {
-      return res.status(400).json({ message: "Invalid course ID format" });
-    }
-    
-    const enrollment = await enrollmentsCollection.findOne({ 
-      email, 
-      courseId: new ObjectId(courseId) 
-    });
-    
-    res.json({ enrolled: !!enrollment, enrollment });
-  } catch (error) {
-    console.error("Error checking enrollment:", error);
-    res.status(500).json({ message: "Failed to check enrollment", error: error.message });
-  }
-});
-
-// Get all enrolled courses for a user
-app.get("/enrollments", async (req, res) => {
-  try {
-    const email = req.query.email;
-    
-    if (!email) {
-      return res.status(400).json({ message: "Email is required" });
-    }
-    
-    const enrollments = await enrollmentsCollection.find({ email }).toArray();
-    
-    // Get course details for each enrollment
-    const courseIds = enrollments.map(e => e.courseId);
-    const courses = await coursesCollection.find({ 
-      _id: { $in: courseIds } 
-    }).toArray();
-    
-    // Merge enrollment and course data
-    const enrolledCourses = enrollments.map(enrollment => {
-      const course = courses.find(c => c._id.equals(enrollment.courseId));
-      return {
-        ...enrollment,
-        course: course || null
-      };
-    });
-    
-    res.json(enrolledCourses);
-  } catch (error) {
-    console.error("Error fetching enrollments:", error);
-    res.status(500).json({ message: "Failed to fetch enrollments", error: error.message });
-  }
-});
-
-// Remove enrollment
-app.delete("/enrollments", async (req, res) => {
-  try {
-    const { email, courseId } = req.body;
-    
-    if (!email || !courseId) {
-      return res.status(400).json({ message: "Email and courseId are required" });
-    }
-    
-    if (!ObjectId.isValid(courseId)) {
-      return res.status(400).json({ message: "Invalid course ID format" });
-    }
-    
-    const result = await enrollmentsCollection.deleteOne({ 
-      email, 
-      courseId: new ObjectId(courseId) 
-    });
-    
-    if (result.deletedCount === 0) {
-      return res.status(404).json({ message: "Enrollment not found" });
-    }
-    
-    // Decrease course enrollment count
-    await coursesCollection.updateOne(
-      { _id: new ObjectId(courseId) },
-      { $inc: { enrollCount: -1 } }
-    );
-    
-    res.json({ message: "Successfully removed enrollment", deletedCount: result.deletedCount });
-  } catch (error) {
-    console.error("Error removing enrollment:", error);
-    res.status(500).json({ message: "Failed to remove enrollment", error: error.message });
-  }
-});
 
 // Error handling middleware
 app.use((error, req, res, next) => {
