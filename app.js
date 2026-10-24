@@ -4,6 +4,7 @@ const { getCollections } = require("./config/database");
 const createCourseRouter = require("./routes/course.routes");
 const createEnrollmentRouter = require("./routes/enrollment.routes");
 const createReviewRouter = require("./routes/review.routes");
+const errorHandler = require("./middleware/error-handler");
 
 const app = express();
 const collections = getCollections();
@@ -27,25 +28,11 @@ app.use("/courses", createCourseRouter(collections));
 app.use("/enrollments", createEnrollmentRouter(collections));
 app.use("/courses", createReviewRouter(collections));
 
-// Error handling middleware
-app.use((error, req, res, next) => {
-  console.error("Unhandled error:", error);
-  res.status(500).json({ message: "Internal server error", error: error.message });
-});
-
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
-// Start server only after DB connection
-// run().then(() => {
- 
-// }).catch(error => {
-//   console.error("Failed to start server:", error);
-//   process.exit(1);
-// });
-
-
+app.use(errorHandler);
 
 module.exports = app;

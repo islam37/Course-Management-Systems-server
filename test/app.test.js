@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const request = require("supertest");
 
 const app = require("../app");
+const errorHandler = require("../middleware/error-handler");
 
 test("GET / returns the server health response", async () => {
   const response = await request(app).get("/");
@@ -83,5 +84,24 @@ test("enrollment deletion rejects invalid course IDs", async () => {
   assert.equal(response.statusCode, 400);
   assert.deepEqual(response.body, {
     message: "Invalid course ID format"
+  });
+});
+
+test("error handler hides internal error details", () => {
+  const response = {
+    status(statusCode) {
+      this.statusCode = statusCode;
+      return this;
+    },
+    json(body) {
+      this.body = body;
+    }
+  };
+
+  errorHandler(new Error("database credentials should not be exposed"), {}, response, () => {});
+
+  assert.equal(response.statusCode, 500);
+  assert.deepEqual(response.body, {
+    message: "Internal server error"
   });
 });
