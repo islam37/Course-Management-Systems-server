@@ -5,6 +5,10 @@ function errorHandler(error, req, res, next) {
     return next(error);
   }
 
+  if (error.code === 11000) {
+    return res.status(409).json({ message: "Resource already exists" });
+  }
+
   res.status(500).json({ message: "Internal server error" });
 }
 
