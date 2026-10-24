@@ -171,7 +171,7 @@ app.delete("/courses/:id", async (req, res) => {
     }
     
     // Also remove any enrollments for this course
-    await enrollmentsCollection.deleteMany({ courseId: id });
+    await enrollmentsCollection.deleteMany({ courseId: new ObjectId(id) });
     
     res.json({ message: "Course deleted successfully", deletedCount: result.deletedCount });
   } catch (error) {
