@@ -1,6 +1,7 @@
 const express = require("express");
 const { ObjectId } = require("mongodb");
 const asyncHandler = require("../middleware/async-handler");
+const { validateCourseInput } = require("../validators/request.validators");
 
 function createCourseRouter({ coursesCollection, enrollmentsCollection }) {
   const router = express.Router();
@@ -32,8 +33,9 @@ function createCourseRouter({ coursesCollection, enrollmentsCollection }) {
   router.post("/", asyncHandler(async (req, res) => {
     const newCourse = req.body;
 
-    if (!newCourse.title || !newCourse.shortDescription) {
-      return res.status(400).json({ message: "Title and description are required" });
+    const validationError = validateCourseInput(newCourse);
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
     }
 
     newCourse.createdAt = new Date();

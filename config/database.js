@@ -32,6 +32,10 @@ const database = client.db(configuration.name);
 async function connectToDatabase() {
   await client.connect();
   await database.command({ ping: 1 });
+  await database.collection("enrollments").createIndex(
+    { email: 1, courseId: 1 },
+    { unique: true }
+  );
   return database;
 }
 

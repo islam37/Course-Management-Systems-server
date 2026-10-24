@@ -14,7 +14,7 @@ const collections = getCollections();
 app.use(express.json());
 
 app.use(cors({
-  origin: "*" 
+  origin: process.env.CORS_ORIGIN || "*"
 }));
 
 // Routes

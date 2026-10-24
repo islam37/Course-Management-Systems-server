@@ -1,6 +1,7 @@
 const express = require("express");
 const { ObjectId } = require("mongodb");
 const asyncHandler = require("../middleware/async-handler");
+const { validateEnrollmentInput } = require("../validators/request.validators");
 
 function createEnrollmentRouter({ coursesCollection, enrollmentsCollection }) {
   const router = express.Router();
@@ -8,8 +9,9 @@ function createEnrollmentRouter({ coursesCollection, enrollmentsCollection }) {
   router.post("/", asyncHandler(async (req, res) => {
     const { email, courseId } = req.body;
 
-    if (!email || !courseId) {
-      return res.status(400).json({ message: "Email and courseId are required" });
+    const validationError = validateEnrollmentInput({ email, courseId });
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
     }
 
     if (!ObjectId.isValid(courseId)) {
@@ -58,8 +60,9 @@ function createEnrollmentRouter({ coursesCollection, enrollmentsCollection }) {
   router.get("/check", asyncHandler(async (req, res) => {
     const { email, courseId } = req.query;
 
-    if (!email || !courseId) {
-      return res.status(400).json({ message: "Email and courseId are required" });
+    const validationError = validateEnrollmentInput({ email, courseId });
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
     }
 
     if (!ObjectId.isValid(courseId)) {
@@ -79,6 +82,10 @@ function createEnrollmentRouter({ coursesCollection, enrollmentsCollection }) {
 
     if (!email) {
       return res.status(400).json({ message: "Email is required" });
+    }
+
+    if (!validateEnrollmentInput({ email, courseId: "valid" })) {
+      return res.status(400).json({ message: "A valid email is required" });
     }
 
     const enrollments = await enrollmentsCollection.find({ email }).toArray();
@@ -102,8 +109,9 @@ function createEnrollmentRouter({ coursesCollection, enrollmentsCollection }) {
   router.delete("/", asyncHandler(async (req, res) => {
     const { email, courseId } = req.body;
 
-    if (!email || !courseId) {
-      return res.status(400).json({ message: "Email and courseId are required" });
+    const validationError = validateEnrollmentInput({ email, courseId });
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
     }
 
     if (!ObjectId.isValid(courseId)) {

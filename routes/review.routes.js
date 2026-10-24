@@ -1,6 +1,7 @@
 const express = require("express");
 const { ObjectId } = require("mongodb");
 const asyncHandler = require("../middleware/async-handler");
+const { validateReviewInput } = require("../validators/request.validators");
 
 function createReviewRouter({ coursesCollection }) {
   const router = express.Router();
@@ -13,8 +14,9 @@ function createReviewRouter({ coursesCollection }) {
       return res.status(400).json({ message: "Invalid course ID format" });
     }
 
-    if (!name || !rating || !comment) {
-      return res.status(400).json({ message: "All fields are required" });
+    const validationError = validateReviewInput({ name, rating, comment });
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
     }
 
     const newReview = {
