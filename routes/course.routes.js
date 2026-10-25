@@ -1,5 +1,6 @@
 const express = require("express");
 const asyncHandler = require("../middleware/async-handler");
+const { requireAuth, requireRole } = require("../middleware/auth");
 const createCourseController = require("../controllers/course.controller");
 const createCourseService = require("../services/course.service");
 
@@ -10,9 +11,24 @@ function createCourseRouter(collections) {
 
   router.get("/", asyncHandler(courseController.getCourses));
   router.get("/:id", asyncHandler(courseController.getCourse));
-  router.post("/", asyncHandler(courseController.createCourse));
-  router.put("/:id", asyncHandler(courseController.updateCourse));
-  router.delete("/:id", asyncHandler(courseController.deleteCourse));
+  router.post(
+    "/",
+    requireAuth,
+    requireRole("admin", "instructor"),
+    asyncHandler(courseController.createCourse)
+  );
+  router.put(
+    "/:id",
+    requireAuth,
+    requireRole("admin", "instructor"),
+    asyncHandler(courseController.updateCourse)
+  );
+  router.delete(
+    "/:id",
+    requireAuth,
+    requireRole("admin"),
+    asyncHandler(courseController.deleteCourse)
+  );
 
   return router;
 }

@@ -30,9 +30,15 @@ function createCourseService({ coursesCollection, enrollmentsCollection }) {
     return coursesCollection.findOne({ _id: new ObjectId(id) });
   }
 
-  async function createCourse(courseData) {
+  async function createCourse(courseData, user) {
     const course = {
-      ...courseData,
+      title: courseData.title,
+      shortDescription: courseData.shortDescription,
+      imageURL: courseData.imageURL,
+      duration: courseData.duration,
+      fullDescription: courseData.fullDescription,
+      createdBy: user.email || user.uid,
+      createdByUid: user.uid,
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -45,7 +51,17 @@ function createCourseService({ coursesCollection, enrollmentsCollection }) {
     };
   }
 
-  async function updateCourse(id, courseData) {
+  async function updateCourse(id, courseData, user) {
+    const existingCourse = await coursesCollection.findOne({ _id: new ObjectId(id) });
+
+    if (!existingCourse) {
+      return null;
+    }
+
+    if (user.role !== "admin" && existingCourse.createdByUid !== user.uid) {
+      return { forbidden: true };
+    }
+
     const { title, shortDescription, imageURL, duration, fullDescription } = courseData;
     const updateData = {
       title,
@@ -67,10 +83,22 @@ function createCourseService({ coursesCollection, enrollmentsCollection }) {
       { $set: updateData }
     );
 
-    return result.matchedCount === 0 ? null : result.modifiedCount;
+    return { modifiedCount: result.modifiedCount };
   }
 
-  async function deleteCourse(id) {
+  async function deleteCourse(id, user) {
+    if (user.role !== "admin") {
+      const course = await coursesCollection.findOne({ _id: new ObjectId(id) });
+
+      if (!course) {
+        return 0;
+      }
+
+      if (course.createdByUid !== user.uid) {
+        return -1;
+      }
+    }
+
     const result = await coursesCollection.deleteOne({ _id: new ObjectId(id) });
 
     if (result.deletedCount > 0) {

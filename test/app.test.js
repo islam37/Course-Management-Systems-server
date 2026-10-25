@@ -34,25 +34,25 @@ test("course routes reject invalid MongoDB IDs", async () => {
   });
 });
 
-test("enrollment creation rejects invalid course IDs", async () => {
+test("enrollment creation requires authentication", async () => {
   const response = await request(app)
     .post("/enrollments")
     .send({ email: "student@example.com", courseId: "not-an-object-id" });
 
-  assert.equal(response.statusCode, 400);
+  assert.equal(response.statusCode, 401);
   assert.deepEqual(response.body, {
-    message: "Invalid course ID format"
+    message: "Authentication required"
   });
 });
 
-test("review creation rejects invalid course IDs", async () => {
+test("review creation requires authentication", async () => {
   const response = await request(app)
     .post("/courses/not-an-object-id/reviews")
     .send({ name: "Student", rating: 5, comment: "Useful course" });
 
-  assert.equal(response.statusCode, 400);
+  assert.equal(response.statusCode, 401);
   assert.deepEqual(response.body, {
-    message: "Invalid course ID format"
+    message: "Authentication required"
   });
 });
 
@@ -77,14 +77,14 @@ test("enrollment checks reject invalid course IDs", async () => {
   });
 });
 
-test("enrollment deletion rejects invalid course IDs", async () => {
+test("enrollment deletion requires authentication", async () => {
   const response = await request(app)
     .delete("/enrollments")
     .send({ email: "student@example.com", courseId: "not-an-object-id" });
 
-  assert.equal(response.statusCode, 400);
+  assert.equal(response.statusCode, 401);
   assert.deepEqual(response.body, {
-    message: "Invalid course ID format"
+    message: "Authentication required"
   });
 });
 
@@ -107,25 +107,25 @@ test("error handler hides internal error details", () => {
   });
 });
 
-test("course creation rejects blank required fields", async () => {
+test("course creation requires authentication", async () => {
   const response = await request(app)
     .post("/courses")
     .send({ title: "   ", shortDescription: "Description" });
 
-  assert.equal(response.statusCode, 400);
+  assert.equal(response.statusCode, 401);
   assert.deepEqual(response.body, {
-    message: "Title is required"
+    message: "Authentication required"
   });
 });
 
-test("enrollment creation rejects invalid email addresses", async () => {
+test("enrollment creation requires authentication before validating input", async () => {
   const response = await request(app)
     .post("/enrollments")
     .send({ email: "not-an-email", courseId: "not-an-object-id" });
 
-  assert.equal(response.statusCode, 400);
+  assert.equal(response.statusCode, 401);
   assert.deepEqual(response.body, {
-    message: "A valid email is required"
+    message: "Authentication required"
   });
 });
 

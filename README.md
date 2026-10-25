@@ -53,6 +53,9 @@ cp .env.example .env
 | `DB_NAME` | Yes | — | Database name |
 | `DB_HOST` | No | `cluster0.pihhew7.mongodb.net` | MongoDB Atlas host |
 | `CORS_ORIGIN` | No | `*` | Allowed CORS origin |
+| `FIREBASE_PROJECT_ID` | Yes for protected endpoints | — | Firebase project ID |
+| `FIREBASE_CLIENT_EMAIL` | Yes for protected endpoints | — | Firebase Admin service-account email |
+| `FIREBASE_PRIVATE_KEY` | Yes for protected endpoints | — | Firebase Admin private key |
 
 The MongoDB username and password are URL-encoded before being included in the connection string. `DB_HOST` should contain only the MongoDB host, without `mongodb+srv://` or a path.
 
@@ -300,8 +303,12 @@ The serverless entry point still connects to MongoDB through the shared MongoDB 
 
 ## Security and production notes
 
-- The API currently has no authentication or authorization layer; any client that can reach it can call course-management endpoints.
+- Protected endpoints require a Firebase ID token in `Authorization: Bearer <token>`.
+- Firebase custom claims must include `student`, `instructor`, or `admin` as the `role`.
+- Course creation is available to instructors and admins; updates are limited to course owners and admins; deletion is limited to admins.
+- Enrollment writes and review creation require an authenticated role.
 - Use a least-privilege MongoDB user and keep `.env` out of version control.
 - Restrict `CORS_ORIGIN` to trusted frontend origins in production.
-- Validate and authorize `createdBy` and administrative operations at the application boundary when authentication is introduced.
+- Never trust `createdBy`, `createdByUid`, or `role` values from request bodies.
+- Never commit Firebase service-account credentials.
 - The enrollment uniqueness rule is enforced by MongoDB, so duplicate requests remain protected under concurrent writes.

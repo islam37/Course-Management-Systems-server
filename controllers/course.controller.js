@@ -47,7 +47,7 @@ function createCourseController(courseService) {
       return res.status(400).json({ message: validationError });
     }
 
-    const course = await courseService.createCourse(req.body);
+    const course = await courseService.createCourse(req.body, req.user);
 
     res.status(201).json({
       message: "Course created successfully",
@@ -63,15 +63,19 @@ function createCourseController(courseService) {
       return res.status(400).json({ message: "Invalid course ID format" });
     }
 
-    const modifiedCount = await courseService.updateCourse(id, req.body);
+    const result = await courseService.updateCourse(id, req.body, req.user);
 
-    if (modifiedCount === null) {
+    if (result === null) {
       return res.status(404).json({ message: "Course not found" });
+    }
+
+    if (result.forbidden) {
+      return res.status(403).json({ message: "Insufficient permissions" });
     }
 
     res.json({
       message: "Course updated successfully",
-      modifiedCount
+      modifiedCount: result.modifiedCount
     });
   }
 
@@ -82,7 +86,11 @@ function createCourseController(courseService) {
       return res.status(400).json({ message: "Invalid course ID format" });
     }
 
-    const deletedCount = await courseService.deleteCourse(id);
+    const deletedCount = await courseService.deleteCourse(id, req.user);
+
+    if (deletedCount === -1) {
+      return res.status(403).json({ message: "Insufficient permissions" });
+    }
 
     if (deletedCount === 0) {
       return res.status(404).json({ message: "Course not found" });
