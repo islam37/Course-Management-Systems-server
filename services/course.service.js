@@ -1,9 +1,29 @@
 const { ObjectId } = require("mongodb");
 
 function createCourseService({ coursesCollection, enrollmentsCollection }) {
-  async function findCourses(email) {
+  async function findCourses(email, pagination) {
     const query = email ? { createdBy: email } : {};
-    return coursesCollection.find(query).toArray();
+    const cursor = coursesCollection.find(query);
+
+    if (!pagination) {
+      return cursor.toArray();
+    }
+
+    const { page, limit } = pagination;
+    const [courses, total] = await Promise.all([
+      cursor.skip((page - 1) * limit).limit(limit).toArray(),
+      coursesCollection.countDocuments(query)
+    ]);
+
+    return {
+      data: courses,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
   }
 
   async function findCourseById(id) {
