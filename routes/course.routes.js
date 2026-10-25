@@ -1,113 +1,18 @@
 const express = require("express");
-const { ObjectId } = require("mongodb");
 const asyncHandler = require("../middleware/async-handler");
-const { validateCourseInput } = require("../validators/request.validators");
+const createCourseController = require("../controllers/course.controller");
+const createCourseService = require("../services/course.service");
 
-function createCourseRouter({ coursesCollection, enrollmentsCollection }) {
+function createCourseRouter(collections) {
   const router = express.Router();
+  const courseService = createCourseService(collections);
+  const courseController = createCourseController(courseService);
 
-  router.get("/", asyncHandler(async (req, res) => {
-    const email = req.query.email;
-    const query = email ? { createdBy: email } : {};
-    const courses = await coursesCollection.find(query).toArray();
-
-    res.json(courses);
-  }));
-
-  router.get("/:id", asyncHandler(async (req, res) => {
-    const id = req.params.id;
-
-    if (!ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid course ID format" });
-    }
-
-    const course = await coursesCollection.findOne({ _id: new ObjectId(id) });
-
-    if (!course) {
-      return res.status(404).json({ message: "Course not found" });
-    }
-
-    res.json(course);
-  }));
-
-  router.post("/", asyncHandler(async (req, res) => {
-    const newCourse = req.body;
-
-    const validationError = validateCourseInput(newCourse);
-    if (validationError) {
-      return res.status(400).json({ message: validationError });
-    }
-
-    newCourse.createdAt = new Date();
-    newCourse.updatedAt = new Date();
-
-    const result = await coursesCollection.insertOne(newCourse);
-
-    res.status(201).json({
-      message: "Course created successfully",
-      id: result.insertedId,
-      ...newCourse
-    });
-  }));
-
-  router.put("/:id", asyncHandler(async (req, res) => {
-    const id = req.params.id;
-    const { title, shortDescription, imageURL, duration, fullDescription } = req.body;
-
-    if (!ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid course ID format" });
-    }
-
-    const updateData = {
-      title,
-      shortDescription,
-      imageURL,
-      duration,
-      fullDescription,
-      updatedAt: new Date()
-    };
-
-    Object.keys(updateData).forEach((key) => {
-      if (updateData[key] === undefined) {
-        delete updateData[key];
-      }
-    });
-
-    const result = await coursesCollection.updateOne(
-      { _id: new ObjectId(id) },
-      { $set: updateData }
-    );
-
-    if (result.matchedCount === 0) {
-      return res.status(404).json({ message: "Course not found" });
-    }
-
-    res.json({
-      message: "Course updated successfully",
-      modifiedCount: result.modifiedCount
-    });
-  }));
-
-  router.delete("/:id", asyncHandler(async (req, res) => {
-    const id = req.params.id;
-
-    if (!ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid course ID format" });
-    }
-
-    const result = await coursesCollection.deleteOne({ _id: new ObjectId(id) });
-
-    if (result.deletedCount === 0) {
-      return res.status(404).json({ message: "Course not found" });
-    }
-
-    await enrollmentsCollection.deleteMany({ courseId: new ObjectId(id) });
-
-    res.json({
-      message: "Course deleted successfully",
-      deletedCount: result.deletedCount
-    });
-  }));
+  router.get("/", asyncHandler(courseController.getCourses));
+  router.get("/:id", asyncHandler(courseController.getCourse));
+  router.post("/", asyncHandler(courseController.createCourse));
+  router.put("/:id", asyncHandler(courseController.updateCourse));
+  router.delete("/:id", asyncHandler(courseController.deleteCourse));
 
   return router;
 }
