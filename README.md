@@ -10,7 +10,11 @@ Backend service for managing courses, student enrollments, and course reviews. T
 - Duplicate-enrollment protection
 - Automatic enrollment counts on courses
 - Course reviews with ratings from 1 to 5
+- Firebase ID-token authentication and role-based authorization
+- Course ownership enforcement for instructors
+- Paginated course listing
 - Request validation and consistent JSON error responses
+- Patched npm dependency overrides for known transitive vulnerabilities
 - MongoDB indexes for unique student/course enrollments
 - Graceful database shutdown on `SIGINT` and `SIGTERM`
 
@@ -20,6 +24,7 @@ Backend service for managing courses, student enrollments, and course reviews. T
 - **Framework:** Express 5
 - **Database:** MongoDB Atlas or any compatible MongoDB deployment
 - **MongoDB driver:** `mongodb`
+- **Authentication:** Firebase Authentication and Firebase Admin SDK
 - **Testing:** Node.js built-in test runner and Supertest
 - **Deployment:** Vercel (`@vercel/node`)
 
@@ -58,6 +63,11 @@ cp .env.example .env
 | `FIREBASE_PRIVATE_KEY` | Yes for protected endpoints | — | Firebase Admin private key |
 
 The MongoDB username and password are URL-encoded before being included in the connection string. `DB_HOST` should contain only the MongoDB host, without `mongodb+srv://` or a path.
+
+For Firebase, create a service account in Firebase/Google Cloud and provide its project ID,
+client email, and private key. Keep the private key only in environment variables. Replace
+escaped `\n` sequences in the deployed secret only if your hosting platform does not preserve
+them; the application handles escaped newlines in `FIREBASE_PRIVATE_KEY`.
 
 ### 3. Start the server
 
@@ -100,13 +110,37 @@ Returns all courses. Pass `email` to return only courses created by that email:
 GET /courses?email=instructor@example.com
 ```
 
+Optional pagination is enabled with `page` and `limit`:
+
+```http
+GET /courses?page=1&limit=10
+```
+
+`page` must be at least `1`; `limit` must be between `1` and `100`. Paginated responses
+contain `data` and `pagination` fields:
+
+```json
+{
+  "data": [],
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "total": 0,
+    "totalPages": 0
+  }
+}
+```
+
 #### `GET /courses/:id`
 
 Returns one course. Responds with `400` for an invalid ID or `404` when the course does not exist.
 
 #### `POST /courses`
 
-Creates a course. `title` and `shortDescription` are required; other fields are stored when supplied.
+Creates a course. Requires a Firebase ID token for a user with the `instructor` or `admin`
+role. `title` and `shortDescription` are required; other fields are stored when supplied.
+The server sets `createdBy` and `createdByUid` from the verified Firebase user; client-supplied
+ownership fields are ignored.
 
 ```json
 {
@@ -114,8 +148,7 @@ Creates a course. `title` and `shortDescription` are required; other fields are 
   "shortDescription": "Build HTTP APIs with Node.js and Express.",
   "fullDescription": "A practical introduction to server-side JavaScript.",
   "imageURL": "https://example.com/node-course.jpg",
-  "duration": "6 weeks",
-  "createdBy": "instructor@example.com"
+  "duration": "6 weeks"
 }
 ```
 
@@ -123,7 +156,8 @@ The server adds `createdAt` and `updatedAt` timestamps. A successful request ret
 
 #### `PUT /courses/:id`
 
-Updates any supplied course fields from the following set:
+Updates any supplied course fields from the following set. Requires an authenticated
+`instructor` or `admin`; instructors may update only their own courses:
 
 - `title`
 - `shortDescription`
@@ -135,15 +169,19 @@ The server updates `updatedAt`. Unspecified fields are left unchanged.
 
 #### `DELETE /courses/:id`
 
-Deletes a course and removes its related enrollment records. Reviews are embedded in the course document and are deleted with the course.
+Deletes a course and removes its related enrollment records. Requires an authenticated
+`admin`. Reviews are embedded in the course document and are deleted with the course.
 
 ### Enrollments
 
-Enrollments use an email address as the student identifier. Authentication is not implemented by this service.
+Enrollments use an email address as the student identifier. Enrollment creation and removal
+require a Firebase ID token with a valid role. The current API does not automatically replace
+the submitted email with the Firebase email, so clients should submit the authenticated user's
+email.
 
 #### `POST /enrollments`
 
-Enrolls a student in an existing course:
+Enrolls a student in an existing course. Requires a Firebase ID token with a valid role:
 
 ```json
 {
@@ -180,7 +218,7 @@ Returns all enrollments for a student, including the current course document und
 
 #### `DELETE /enrollments`
 
-Removes a student's enrollment:
+Removes a student's enrollment. Requires a Firebase ID token with a valid role:
 
 ```json
 {
@@ -191,13 +229,46 @@ Removes a student's enrollment:
 
 Returns `404` if the enrollment does not exist and decrements the course's `enrollCount` after successful removal.
 
+### Authentication and authorization
+
+Protected requests must include the Firebase ID token issued after the frontend user signs in:
+
+```http
+Authorization: Bearer <firebase-id-token>
+```
+
+Firebase custom claims must include a `role` value:
+
+```json
+{
+  "role": "student"
+}
+```
+
+Supported roles are `student`, `instructor`, and `admin`.
+
+| Operation | Access |
+| --- | --- |
+| Read courses and reviews | Public |
+| Read enrollments and enrollment checks | Public |
+| Create a course | `instructor` or `admin` |
+| Update a course | Course owner or `admin` |
+| Delete a course | `admin` |
+| Create or delete an enrollment | Any authenticated role |
+| Create a review | Any authenticated role |
+
+The frontend must obtain the token from Firebase and send it in the `Authorization` header.
+The backend verifies the token and does not trust client-supplied `createdBy`,
+`createdByUid`, or `role` values.
+
 ### Reviews
 
 Reviews are stored inside the corresponding course document.
 
 #### `POST /courses/:id/reviews`
 
-Adds a review. `name` and `comment` are required, and `rating` must be an integer from 1 through 5:
+Adds a review. Requires a Firebase ID token with a valid role. `name` and `comment` are
+required, and `rating` must be an integer from 1 through 5:
 
 ```json
 {
@@ -220,6 +291,8 @@ Returns the course reviews, newest first. Responds with `404` when the course do
 | `200` | Successful read, update, or deletion |
 | `201` | Resource created |
 | `400` | Invalid input or MongoDB ID format |
+| `401` | Missing, invalid, or expired Firebase ID token |
+| `403` | Authenticated user lacks the required role or ownership |
 | `404` | Route, course, or enrollment not found |
 | `409` | Duplicate enrollment or other duplicate-key conflict |
 | `500` | Unexpected server or database error |
@@ -241,6 +314,15 @@ Unexpected internal errors are logged server-side while the response exposes onl
 ├── app.js                         # Express application and route mounting
 ├── index.js                       # Database connection and HTTP server startup
 ├── config/database.js             # MongoDB client and collection access
+├── config/firebase.js              # Firebase Admin initialization
+├── controllers/                   # HTTP request/response handlers
+│   ├── course.controller.js
+│   ├── enrollment.controller.js
+│   └── review.controller.js
+├── services/                      # Business logic and MongoDB operations
+│   ├── course.service.js
+│   ├── enrollment.service.js
+│   └── review.service.js
 ├── routes/
 │   ├── course.routes.js           # Course CRUD endpoints
 │   ├── enrollment.routes.js       # Enrollment endpoints
@@ -249,10 +331,12 @@ Unexpected internal errors are logged server-side while the response exposes onl
 │   └── request.validators.js      # Course, enrollment, and review validation
 ├── middleware/
 │   ├── async-handler.js           # Promise error forwarding
+│   ├── auth.js                    # Firebase token and role verification
 │   └── error-handler.js           # Centralized error responses
 ├── test/
 │   └── app.test.js                # API and validation tests
 ├── .env.example                   # Environment variable template
+├── package.json                   # Scripts, dependencies, and npm overrides
 └── vercel.json                    # Vercel deployment configuration
 ```
 
@@ -279,7 +363,10 @@ Run the test suite with:
 npm test
 ```
 
-The tests cover the health endpoint, unknown routes, ObjectId validation, request validation, and safe error responses. The application validates `DB_USER`, `DB_PASS`, and `DB_NAME` while it is loaded, so provide those variables when running the suite; the current tests do not open a MongoDB connection.
+The tests cover the health endpoint, unknown routes, ObjectId validation, authentication
+boundaries, request validation, and safe error responses. The application validates
+`DB_USER`, `DB_PASS`, and `DB_NAME` while it is loaded, so provide those variables when
+running the suite; the current tests do not open a MongoDB connection.
 
 For example:
 
@@ -296,8 +383,9 @@ To deploy:
 1. Import the repository into Vercel.
 2. Add `DB_USER`, `DB_PASS`, and `DB_NAME` as production environment variables.
 3. Add `DB_HOST` if the deployment uses a host other than the default.
-4. Set `CORS_ORIGIN` to the deployed frontend origin, or to `*` only when unrestricted access is intentional.
-5. Deploy the project.
+4. Add `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY`.
+5. Set `CORS_ORIGIN` to the deployed frontend origin, or to `*` only when unrestricted access is intentional.
+6. Deploy the project.
 
 The serverless entry point still connects to MongoDB through the shared MongoDB client in `config/database.js`.
 
